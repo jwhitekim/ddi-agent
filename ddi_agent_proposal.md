@@ -187,6 +187,12 @@ C: LLM이 코드 작성 → 실행 서버(①)가 실행 → ddi.predict()가 �
 B: LLM이 코드 작성 → 실행 서버(①)가 실행 → 환경 ② 파이썬으로 직접 쓴 추론 스크립트 실행 → 결과 반환
 ```
 
+- 이미지(`docker/Dockerfile`, 이름 `ddi-runtime`)의 고정 경로 — B·C에게 주는 "환경 ② 위치 안내 한 줄"의 근거
+  - DSN-DDI 저장소(커밋 `6f23522`, 데이터 배치 완료): `/opt/DSN-DDI`
+  - 환경 ② 파이썬: `/opt/conda/envs/dsn/bin/python`
+  - SSI-DDI 설명 파일: `/opt/DSN-DDI/Interaction_information.csv`
+- GPU 사용: 가중치가 cuda 텐서로 저장되어 있어 GPU(Tesla V100, CUDA 10.2)로 실행 → 원 스크립트를 수정하지 않음
+
 - 예측 서버는 가중치 **두 개**를 모두 올려둠
   - `transductive_drugbank.pkl`: 두 약물 모두 학습셋에 있을 때
   - `inductive_drugbank.pkl`: 한쪽이라도 학습셋 밖(신약)일 때

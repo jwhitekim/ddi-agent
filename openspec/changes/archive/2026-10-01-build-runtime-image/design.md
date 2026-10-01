@@ -25,9 +25,10 @@
 
 - **GPU로 실행한다.** 가중치가 cuda 텐서라서 GPU가 있으면 원 스크립트를 한 줄도 고치지 않아도 된다. 그러면 6.3절의 "원 스크립트로 정답 생성"을 그대로 지킬 수 있다.
   - 검토한 대안: CPU로 돌리면서 `map_location="cpu"`를 추가하기. 원 스크립트를 수정해야 해서 채택하지 않음.
-- **CUDA 런타임은 conda `cudatoolkit=10.2`로 넣는다.** 원 저장소의 `Install`과 같은 방식이다. 베이스 이미지는 CUDA 이미지 대신 일반 Ubuntu + Miniconda를 쓴다. 이렇게 하면 호스트에는 드라이버만 있으면 된다. 오래된 `nvidia/cuda:10.2` 태그는 Docker Hub에서 사라졌을 수 있어 그 위험도 피한다.
-  - 대안: `nvidia/cuda:10.2-*` 베이스. 위 이유로 채택하지 않음.
-- **설치 순서는 원 `Install` 스크립트를 따른다.** pytorch 1.9.0 + cudatoolkit 10.2(conda), PyG 휠(cu102, cp37), torch-geometric 2.0.3, rdkit 2020.09.2(conda)를 설치하고, 실제로 쓰는 pandas, scikit-learn을 추가한다. conda에서 pytorch 1.9.0을 받지 못하면 `torch==1.9.0+cu102` pip 휠로 바꾼다.
+- **CUDA 런타임은 `torch==1.9.0+cu102` pip 휠에 들어 있는 것을 쓴다.** 베이스 이미지는 CUDA 이미지 대신 일반 Ubuntu + Miniforge(conda-forge만 사용)를 쓴다. 이렇게 하면 호스트에는 드라이버만 있으면 된다. 오래된 `nvidia/cuda:10.2` 태그는 Docker Hub에서 사라졌을 수 있어 그 위험도 피한다.
+  - 대안 1: `nvidia/cuda:10.2-*` 베이스. 위 이유로 채택하지 않음.
+  - 대안 2: 원 `Install`처럼 conda `pytorch==1.9.0 cudatoolkit=10.2` + Miniconda. Anaconda 기본 채널은 이용약관 동의 절차가 필요하고, pip 휠 주소가 살아 있음을 확인해서 채택하지 않음 (구현 중 변경, `docker/REPRODUCTION.md` 참고).
+- **버전은 원 `Install`과 같게 맞춘다.** conda로 python 3.7, rdkit 2020.09.2, pandas, scikit-learn을 설치하고, pip로 torch 1.9.0+cu102, PyG 휠(cu102, cp37), torch-geometric 2.0.3을 설치한다.
 - **저장소는 빌드할 때 고정 커밋 `6f23522`로 클론한다.** 로컬 `Drug-Interaction-Research/` 클론은 분석용으로만 쓰고 이미지에 복사하지 않는다. 그래야 이미지가 로컬 상태에 의존하지 않는다.
 - **데이터는 GitHub LFS 미디어 URL에서 직접 받는다.** 받은 뒤 sha256을 확인하고, 압축을 풀어 README대로 `drugbank_test/` 아래에 배치한다. `git lfs`는 설치하지 않는다.
   - 주의: README는 `dataset/inductive`를 복사하라고 하지만, 스크립트는 `drugbank_test/inductive_data/fold3/`을 읽는다. 압축을 푼 실제 폴더 이름을 보고 스크립트가 읽는 경로에 맞춘다.
