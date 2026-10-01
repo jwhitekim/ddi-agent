@@ -1,0 +1,4 @@
+[submodule "Drug-Interaction-Research"]
+	path = Drug-Interaction-Research
+	url = https://github.com/microsoft/Drug-Interaction-Research.git
+	branch = DSN-DDI-for-DDI-Prediction
