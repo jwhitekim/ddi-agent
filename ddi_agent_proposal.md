@@ -1,8 +1,10 @@
-# DSN-DDI 과학 에이전트 — 실험 설정 (초안 v0.5)
+# DSN-DDI 과학 에이전트 — 실험 설정 (초안 v0.6)
 
 작성일: 2026-09-30 · 목표 기간: 2주
 
 > ✅ = 합의됨 · ⚠️ = 확인 필요 · ❓ = 아직 안 정함
+>
+> v0.6 변경: 조건별로 받는 것 명시(B·C 공통 재료, C에게만 ACI), `lookup_known` 삭제(에이전트는 정답을 볼 수 없음), 채점용 CSV에 `description` 칼럼 추가, C′ ablation 삭제
 >
 > v0.5 변경: 4편 원문(SWE-agent, CodeAct, OpenHands, Zero-shot Planner) 대조로 용어 점검 — ACI 구성 요소를 SWE-agent 원어(commands, documentation, environment feedback, guardrails)로 교체, "행동 공간·관찰 공간 재설계" 표현 삭제, "스텝" → "상호작용 턴", "semantic error" → "semantically incorrect", 용어 점검표(0.2) 추가
 >
@@ -177,11 +179,12 @@ Dockerfile 1개, 이미지 1개, 컨테이너 1개. 안에 파이썬 환경 2개
 
 | 환경 | 파이썬 | 역할 | 누가 설치 |
 |---|---|---|---|
-| ① 코드 실행 환경 | 최신 | 에이전트가 쓴 코드 실행, `ddi` 모듈 import | OpenHands가 자동 |
-| ② DSN-DDI 환경 | 3.7 (PyTorch 1.9.0, PyG 2.0.3) | 예측 서버만 실행 | Dockerfile에서 직접 |
+| ① 코드 실행 환경 | 최신 | 에이전트가 쓴 코드 실행 (C는 `ddi` 모듈 import) | OpenHands가 자동 |
+| ② DSN-DDI 환경 | 3.7 (PyTorch 1.9.0, PyG 2.0.3) | DSN-DDI 모델 실행 (C는 예측 서버, B는 직접 쓴 스크립트) | Dockerfile에서 직접 |
 
 ```
-LLM이 코드 작성 → 실행 서버(①)가 실행 → ddi.predict()가 예측 서버(②, localhost)에 요청 → 결과 반환
+C: LLM이 코드 작성 → 실행 서버(①)가 실행 → ddi.predict()가 예측 서버(②, localhost)에 요청 → 결과 반환
+B: LLM이 코드 작성 → 실행 서버(①)가 실행 → 환경 ② 파이썬으로 직접 쓴 추론 스크립트 실행 → 결과 반환
 ```
 
 - 예측 서버는 가중치 **두 개**를 모두 올려둠
@@ -207,7 +210,6 @@ DDI skill:
 | 함수 | 하는 일 |
 |---|---|
 | `resolve_drug(x)` | 영어 이름·동의어·DrugBank ID·SMILES → 표준 약물 정보 |
-| `lookup_known(a, b)` | 데이터에 기록된 상호작용 조회 |
 | `predict(a, b, top_k=3)` | DSN-DDI 예측, transductive/inductive 자동 선택, 학습셋 포함 여부 반환 |
 | `predict_many(pairs, relation=None)` | 여러 쌍 일괄 예측, 특정 관계로 필터 |
 | `explain(rel, a, b)` | 관계 번호 → 문장 (방향 반영) |
@@ -253,12 +255,34 @@ DDI skill:
 | 조건 | 구성 | 보여주는 것 |
 |---|---|---|
 | A. LLM 단독 | 툴 없이 API로 바로 답함 | "모델 없이 LLM 지식으로 충분한가" |
-| B. generalist agent | OpenHands CodeActAgent 그대로 + 같은 런타임 + DSN-DDI 저장소 | generalist agent의 한계 |
-| C. specialist agent | B + domain-specific ACI (DDI skill + micro agent 프롬프트) | domain-specific ACI의 효과 |
+| B. generalist agent | OpenHands CodeActAgent 그대로 + 공통 재료 | generalist agent의 한계 |
+| C. specialist agent | B + domain-specific ACI (예측 서버 + DDI skill + micro agent 프롬프트) | domain-specific ACI의 효과 |
 
+**조건별로 받는 것**
+
+| 항목 | A | B | C |
+|---|---|---|---|
+| 환경 ① (코드 실행) | X | O | O |
+| 환경 ② (DSN-DDI, 파이썬 3.7) | X | O | O |
+| DSN-DDI 저장소 (코드) | X | O | O |
+| 가중치 2개 (transductive, inductive) | X | O | O |
+| 압축을 푼 데이터 (LFS 포인터 대신) | X | O | O |
+| SSI-DDI 설명 파일 (`Interaction_information.csv`) | X | O | O |
+| 환경 ② 위치 안내 한 줄 | X | O | O |
+| 예측 서버 | X | X | O |
+| DDI skill (`ddi` 패키지) | X | X | O |
+| micro agent 프롬프트 | X | X | O |
+
+- B를 실행할 때는 `ddi` 패키지와 예측 서버 코드를 **컨테이너에 두지 않음** (import만 안 하고 파일을 남기면 B가 찾아서 쓸 수 있음)
+- 결정 이유
+  - B에게도 환경 ②와 설명 파일을 줌: 안 주면 B는 실행 단계에서 멈추거나 해석할 재료가 없어 처음부터 틀림 → 정확성 비교가 불가능하고, B와 C의 차이가 "환경 + ACI"가 됨
+  - 저장소 코드를 줌: 가중치(`.pkl`)는 모델 객체째 저장되어 있어 불러오려면 모델 정의 코드가 필요함
+  - 설명 파일은 SSI-DDI 저장소를 클론하지 않고 파일 하나만 복사해서 넣음
+  - 환경 ② 위치 안내 한 줄: ACI가 아니라 런타임에 대한 사실. 없으면 B가 10턴 안에 결과까지 도달하기 어려움
+  - 예측 서버는 C에게만: 서버와 `ddi.predict()`는 ACI의 commands에 해당
 - A는 확률 계산이 불가능하므로 **작업 유형 ①(단일 쌍)에만** 적용
 - A도 API로 실행 (웹 채팅 사용 안 함)
-- ❓ 여유 시: C′ 단계별 ablation — documentation만 → + commands·environment feedback → + guardrails(전체)
+- C′ 단계별 ablation: **하지 않음** (실험 단순화. 논문 한계 절에 언급)
 
 ---
 
@@ -295,8 +319,9 @@ DDI skill:
 - (선택) 질문마다 "유명한 조합인지" 표시 → 채점 후 유명/비유명으로 나눠 성공률 비교 (1.3 가설 확인용, 추가 실험 없음)
 
 ### 6.2 결과 형식 ✅
-- **채점용**: 모든 결과를 CSV로 저장 (`drug_a, drug_b, relation, prob, model_used`)
-- **사람용**: 답변에 ① 확인된 약물 ② 기록된 상호작용 ③ 모델 예측(상위 관계·확률·신뢰도) ④ 한계 표시(예측값임, 신약은 신뢰도 낮음)
+- **채점용**: 모든 결과를 CSV로 저장 (`drug_a, drug_b, relation, prob, model_used, description`)
+  - `description`: 약물 방향이 반영된 최종 관계 문장 — 방향 오류 채점용
+- **사람용**: 답변에 ① 확인된 약물 ② 모델 예측(상위 관계·확률·신뢰도) ③ 한계 표시(예측값임, 신약은 신뢰도 낮음)
 - 표·그래프 이미지는 **채점하지 않음** → 대표 사례만 논문 그림으로 제시
 
 ### 6.3 정답 만들기 ✅
@@ -310,12 +335,12 @@ DDI skill:
 | top-1 정확도 | 보조 지표 (①④) |
 | 충실도 | 에이전트 경로 예측 = 원 스크립트 예측 비율 |
 | 실행 가능성 (executability) | 결과(CSV)까지 도달했는지 — (가) 유형 실패 측정 |
-| 해석 정확도 (correctness) | 관계 번호가 맞았을 때, 최종 문장(관계 종류와 약물 방향)도 맞았는지 — 번호 채점만으로는 (나) 유형 오류가 안 잡힘 |
+| 해석 정확도 (correctness) | 관계 번호가 맞았을 때, 최종 문장(관계 종류와 약물 방향)도 맞았는지 — CSV `description`을 정답 문장과 비교. 번호 채점만으로는 (나) 유형 오류가 안 잡힘 |
 | 한계 표시 | 신약·학습셋 밖 입력에서 신뢰도 경고를 했는지 (④) |
 | 효율 | 평균 상호작용 턴 수, 토큰, 시간, 턴 초과 실패 비율 |
 
 - 안전성(심각도) 지표: **제외** (대상이 연구자로 바뀌어 한계 표시로 대체)
-- ⚠️ ①은 테스트셋에서 뽑아서 `lookup_known`이 정답을 바로 찾을 수 있음 → 조회 결과와 모델 예측을 따로 채점하거나, 조회 대상에서 테스트셋을 빼야 함
+- 에이전트는 정답을 볼 수 없음 — `lookup_known` 제거 (정답을 보면 성능이 실제보다 좋게 나오고, 채점 기준이 모델 예측이라 정답을 답해도 감점될 수 있음)
 
 ### 6.5 A 조건 채점 ✅
 - A는 문장으로 답하므로 86종 중 하나로 분류 필요
@@ -344,9 +369,9 @@ DDI skill:
 | # | 항목 | 상태 |
 |---|---|---|
 | 1 | 작업 유형별 질문 개수 (6.1) | ❓ |
-| 2 | 테스트셋 정답이 조회에 섞이는 문제 처리 (6.4) | ⚠️ 중요 |
+| 2 | 테스트셋 정답이 조회에 섞이는 문제 처리 (6.4) | ✅ 해결 — `lookup_known` 제거 |
 | 3 | 채점기 모델 선택 (6.5) | ⚠️ |
-| 4 | C′ 단계별 ablation 여부 | ❓ 여유 시 |
+| 4 | C′ 단계별 ablation 여부 | ✅ 하지 않음 |
 | 5 | 스모크 테스트 결과 | ⚠️ |
 
 ---
