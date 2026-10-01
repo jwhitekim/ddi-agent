@@ -40,7 +40,7 @@ RUN cd /tmp \
     && rm -rf ds.zip dataset
 
 # SSI-DDI 관계 설명 파일
-COPY Interaction_information.csv /opt/DSN-DDI/Interaction_information.csv
+COPY ddi/data/Interaction_information.csv /opt/DSN-DDI/Interaction_information.csv
 
 WORKDIR /opt/DSN-DDI
 ENV PATH=/opt/conda/envs/dsn/bin:$PATH

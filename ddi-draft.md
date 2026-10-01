@@ -222,6 +222,13 @@ DDI skill:
 | `save_results(df, path)` | 결과를 채점용 CSV로 저장 |
 | 검사 기능 | 모르는 약물, 학습셋 밖 약물, 원자 특징 unknown 경고 |
 
+구현 세부 (`ddi/`, `server/`)
+- 확률: 관계마다 따로 계산한 `sigmoid(score)` — 86개의 합이 1이 아님 ("관계별 확률")
+- 모델 선택: 두 약물이 모두 transductive 학습셋(`drugbank/fold0/train.csv`의 약물)에 있으면 transductive, 아니면 inductive (DSN-DDI 약물 중 20개는 fold0 train에 없음)
+- **쌍 하나씩 계산**: 원 모델은 이분 그래프에 PyG `GATConv`(기본값 `add_self_loops=True`)를 써서, 여러 쌍을 한 배치로 묶으면 다른 쌍의 원자끼리 연결이 생기고 같은 쌍도 함께 묶인 쌍에 따라 확률이 달라진다. 그래서 서버는 쌍 하나만 넣고 관계 86개를 한 번에 계산한다 (모델·가중치는 원본 그대로). B에게는 이 규칙을 알려주지 않는다 — DSN-DDI 고유의 숨은 규칙이고, 이를 담는 것이 C의 ACI
+- 에러와 경고: 진행할 수 없으면 에러(모르는 약물, 해석할 수 없는 SMILES), 결과는 내되 조심해야 하면 경고(학습셋 밖 약물, 신약, unknown 원자)
+- CSV의 `drug_a`, `drug_b`: DrugBank ID (신약은 SMILES)
+
 ---
 
 ## 3. 데이터
@@ -232,7 +239,7 @@ DDI skill:
 - `dataset/inductive_data/fold0/`: s1(두 약 모두 신약), s2(한쪽만 신약)
 
 ### 3.2 약 이름 ✅
-- DrugBank Vocabulary (CC0) — 공식 다운로드가 중단 상태라 `fgh95/DrugLinker` 사본 사용
+- DrugBank Vocabulary (CC0) — 공식 다운로드가 중단 상태라 `ferrangoeh/DrugLinker`(이전 이름 `fgh95/DrugLinker`)의 `druglinker/dbvocab.csv` 사본 사용 (sha256 `4f19fe91…66d36e2`)
 - 약물 13,475개, DSN-DDI 약물 1,706개 중 **1,701개 커버** (빠진 5개 DB09323, DB13450, DB09396, DB09162, DB11106 → 평가에서 제외)
 - 한국어 이름 매핑: 하지 않음
 
@@ -331,7 +338,8 @@ DDI skill:
 - 표·그래프 이미지는 **채점하지 않음** → 대표 사례만 논문 그림으로 제시
 
 ### 6.3 정답 만들기 ✅
-- 정답은 같은 약물 쌍을 **원 DSN-DDI 스크립트로 직접 실행**해서 계산
+- 정답은 같은 약물 쌍을 **원 DSN-DDI 모델·가중치·데이터 처리 코드로 직접 실행**해서 계산 (원 스크립트는 테스트셋 전체의 이진 지표만 계산하므로, 쌍마다 86개 관계 확률을 내는 부분은 별도 스크립트로 작성)
+- 서버와 같은 방식으로 **쌍 하나씩 계산** (2.3절). B가 여러 쌍을 묶어 계산해 결과가 달라지면 실패로 치되, 실패 원인을 "배치 섞임"으로 따로 집계
 - 에이전트의 CSV와 비교
 
 ### 6.4 지표 ✅
