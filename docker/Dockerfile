@@ -41,6 +41,8 @@ RUN cd /tmp \
 
 # SSI-DDI 관계 설명 파일
 COPY ddi/data/Interaction_information.csv /opt/DSN-DDI/Interaction_information.csv
+# DrugBank 약물 이름 사전 (약물 이름·동의어 -> DrugBank ID, CC0, ferrangoeh/DrugLinker)
+COPY ddi/data/dbvocab.csv /opt/DSN-DDI/drugbank_vocabulary.csv
 
 WORKDIR /opt/DSN-DDI
 ENV PATH=/opt/conda/envs/dsn/bin:$PATH

@@ -1,0 +1,26 @@
+# OpenHands 0.62.0 설정 (run_agent.py 가 조건별로 렌더링). API 키는 환경 변수 LLM_API_KEY 로만 넘긴다.
+[core]
+runtime = "docker"
+default_agent = "CodeActAgent"
+max_iterations = 10
+save_trajectory_path = "{{ trajectory_path }}"
+
+[llm]
+model = "{{ llm_model }}"
+{%- if llm_base_url %}
+base_url = "{{ llm_base_url }}"
+{%- endif %}
+temperature = 0.0
+reasoning_effort = "{{ reasoning_effort }}"
+caching_prompt = true
+
+[agent]
+# B·C 공통: 웹 검색과 외부 도구로 DSN-DDI 규칙을 찾아보지 못하게 끈다
+enable_browsing = false
+enable_mcp = false
+
+[sandbox]
+base_container_image = "{{ base_image }}"
+enable_gpu = true
+# B·C 공통: 작업 폴더, DrugBank 약물 이름 사전 / C 전용: aci_mounts (ddi 패키지, 예측 서버 코드)
+volumes = "{{ workspace }}:/workspace:rw,{{ vocab }}:/opt/DSN-DDI/drugbank_vocabulary.csv:ro{% if aci_mounts %},{{ aci_mounts }}{% endif %}"

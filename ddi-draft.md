@@ -171,7 +171,11 @@ DSN-DDI는 약물 쌍 (d1, d2)에 대해 관계 번호만 출력한다. 관계 �
 
 ### 2.1 에이전트 ✅
 - generalist agent: **OpenHands CodeActAgent** 그대로 사용 (에이전트 루프를 새로 만들지 않음)
+  - 버전: `openhands-ai 0.62.0`(마지막 V0, 2025-11-11)으로 고정. OpenHands는 1.0부터 구조가 바뀌어(V1, Software Agent SDK) CodeActAgent·IPython 셀 실행·micro agent·AgentSkills가 deprecated된 뒤 제거됨. 인용 논문(OpenHands ICLR 2025, CodeAct)과 같은 구조를 쓰려고 V0으로 고정
+  - 헤드리스 모드로 실행(`agent/run_agent.py`), B·C 공통으로 웹 브라우징과 MCP는 끔(웹에서 DSN-DDI 규칙을 찾아보지 못하게)
 - specialist agent: CodeActAgent 구현을 재사용하는 **micro agent** + **domain-specific ACI** (구성은 2.3)
+  - micro agent: 작업 폴더의 `.openhands/microagents/ddi.md`(repo 타입, 항상 적용) — `ddi` 함수 사용법만 적고 관계 번호 해석 규칙은 적지 않음(규칙은 `explain` 안에 있음)
+  - `ddi` 자동 import: 주피터 커널이 시작될 때 IPython 시작 파일이 `import ddi`를 하고, `ddi`가 import될 때 예측 서버를 띄움(AgentSkills와 같은 효과)
 - 입력: 자연어 (한국어 요청, 약 이름은 영어 또는 DrugBank ID, 신약은 SMILES)
 
 ### 2.2 실행 환경 ✅
@@ -242,6 +246,7 @@ DDI skill:
 - DrugBank Vocabulary (CC0) — 공식 다운로드가 중단 상태라 `ferrangoeh/DrugLinker`(이전 이름 `fgh95/DrugLinker`)의 `druglinker/dbvocab.csv` 사본 사용 (sha256 `4f19fe91…66d36e2`)
 - 약물 13,475개, DSN-DDI 약물 1,706개 중 **1,701개 커버** (빠진 5개 DB09323, DB13450, DB09396, DB09162, DB11106 → 평가에서 제외)
 - 한국어 이름 매핑: 하지 않음
+- B·C 공통 재료로 컨테이너의 `/opt/DSN-DDI/drugbank_vocabulary.csv`에 둠 (C의 `ddi` 패키지에도 같은 파일 포함)
 
 ### 3.3 관계 번호 → 문장 대응표 ✅ (완료, `dsn_relation_map.csv`)
 - 설명 출처: SSI-DDI `data/Interaction_information.csv`
@@ -281,6 +286,7 @@ DDI skill:
 | 가중치 2개 (transductive, inductive) | X | O | O |
 | 압축을 푼 데이터 (LFS 포인터 대신) | X | O | O |
 | SSI-DDI 설명 파일 (`Interaction_information.csv`) | X | O | O |
+| DrugBank 약물 이름 사전 (`drugbank_vocabulary.csv`) | X | O | O |
 | 환경 ② 위치 안내 한 줄 | X | O | O |
 | 예측 서버 | X | X | O |
 | DDI skill (`ddi` 패키지) | X | X | O |
@@ -291,6 +297,7 @@ DDI skill:
   - B에게도 환경 ②와 설명 파일을 줌: 안 주면 B는 실행 단계에서 멈추거나 해석할 재료가 없어 처음부터 틀림 → 정확성 비교가 불가능하고, B와 C의 차이가 "환경 + ACI"가 됨
   - 저장소 코드를 줌: 가중치(`.pkl`)는 모델 객체째 저장되어 있어 불러오려면 모델 정의 코드가 필요함
   - 설명 파일은 SSI-DDI 저장소를 클론하지 않고 파일 하나만 복사해서 넣음
+  - DrugBank 약물 이름 사전도 줌: DSN-DDI 데이터에는 약물 이름이 없어서, 없으면 B는 "Warfarin"을 ID로 바꾸지 못해 식별 단계에서 막힘 (스모크 테스트에서 확인)
   - 환경 ② 위치 안내 한 줄: ACI가 아니라 런타임에 대한 사실. 없으면 B가 10턴 안에 결과까지 도달하기 어려움
   - 예측 서버는 C에게만: 서버와 `ddi.predict()`는 ACI의 commands에 해당
 - A는 확률 계산이 불가능하므로 **작업 유형 ①(단일 쌍)에만** 적용
@@ -309,9 +316,9 @@ DDI skill:
 | 추론 강도 | Low (비용 절약, 향후 변경 가능) |
 | temperature | 0.0 고정 (temperature 실험 제외) |
 | 최대 상호작용 턴 | 10 (OpenHands `max_iterations`), 초과 시 실패 — CodeAct M³ToolEval과 같은 기준 |
-| OpenHands 버전 | 시작 시점 최신, 버전 번호 기록 후 고정 |
+| OpenHands 버전 | `openhands-ai 0.62.0` 고정 (마지막 V0, 2.1절) |
 
-⚠️ 스모크 테스트: Sonnet 5.5 동작, temperature·추론 강도 실제 적용 여부, 캐싱 적용 여부
+⚠️ 스모크 테스트 (`agent/SMOKE_TEST.md`): B·C 연결 흐름은 임시 모델 `gemini-3.5-flash`로 확인함 (C: 6턴 완료, 관계 5·방향 정답 / B: 10턴 초과). Gemini에서는 추론 강도·캐싱이 적용되었지만 **temperature 0.0에서도 같은 요청의 답이 달랐음**. Sonnet 5.5(Vercel AI Gateway)로 모델·temperature·추론 강도·캐싱을 다시 확인해야 함
 
 ---
 

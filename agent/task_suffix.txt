@@ -1,0 +1,3 @@
+
+
+참고: DSN-DDI 저장소(가중치, 데이터 포함)는 /opt/DSN-DDI 에 있고, 그 실행용 파이썬은 /opt/conda/envs/dsn/bin/python 입니다. 최종 결과는 /workspace 에 CSV 파일로 저장하세요. CSV 칼럼은 drug_a, drug_b, relation, prob, model_used, description 입니다.
