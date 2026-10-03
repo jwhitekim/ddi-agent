@@ -14,17 +14,17 @@
 - **THEN** 출력 폴더의 실행 정보에 `openhands-ai 0.62.0`과 `CodeActAgent`가 기록되어 있다
 
 ### Requirement: B와 C는 ACI 외의 설정이 같다
-B와 C 실행은 같은 LLM 설정(모델, temperature 0.0, 추론 강도), 같은 최대 상호작용 턴(10), 같은 GPU 설정, 같은 질문 문장을 써야 한다(SHALL). 질문 문장 뒤에는 두 조건 모두 같은 환경 ② 위치 안내 한 줄(`/opt/conda/envs/dsn/bin/python`, `/opt/DSN-DDI`)을 붙여야 한다(SHALL). 두 조건의 차이는 기본 이미지(`ddi-runtime` / `ddi-specialist`), 작업 폴더의 `.openhands/` 내용, `ddi` 자동 import 설정뿐이어야 한다(MUST).
+B와 C 실행은 같은 LLM 설정(모델, temperature 0.0, 확장 추론 없음), 같은 최대 상호작용 턴(30), 같은 GPU 설정, 같은 질문 문장을 써야 한다(SHALL). 질문 문장 뒤에는 두 조건 모두 같은 환경 ② 위치 안내 한 줄(`/opt/conda/envs/dsn/bin/python`, `/opt/DSN-DDI`)을 붙여야 한다(SHALL). 두 조건의 차이는 기본 이미지(`ddi-runtime` / `ddi-specialist`), 작업 폴더의 `.openhands/` 내용, C 전용 마운트(`ddi` 패키지, 예측 서버 코드)뿐이어야 한다(MUST).
 
 #### Scenario: 설정 비교
 - **WHEN** 같은 질문으로 B와 C의 OpenHands 설정 파일과 질문 파일을 만들면
-- **THEN** 두 파일의 차이는 기본 이미지, 자동 import 설정 줄뿐이고 질문 파일은 같다
+- **THEN** 설정 파일의 차이는 실행 폴더 경로 외에는 기본 이미지와 C 전용 마운트뿐이고, 질문 파일은 같다
 
 ### Requirement: 최대 상호작용 턴을 넘기면 실패로 기록한다
-실행기는 `max_iterations = 10`으로 실행해야 한다(SHALL). 턴 제한에 걸려 끝나면 실행 정보에 턴 초과 실패로 기록해야 한다(SHALL).
+실행기는 `max_iterations = 30`으로 실행해야 한다(SHALL). 턴 제한에 걸려 끝나면 실행 정보에 턴 초과 실패로 기록해야 한다(SHALL).
 
 #### Scenario: 턴 초과
-- **WHEN** 에이전트가 10턴 안에 끝내지 못하면
+- **WHEN** 에이전트가 30턴 안에 끝내지 못하면
 - **THEN** 실행 정보의 종료 상태가 턴 초과로 기록된다
 
 ### Requirement: C는 시작할 때 도구가 준비된다

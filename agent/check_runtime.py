@@ -40,7 +40,7 @@ def main():
     p.add_argument('--out', required=True)
     args = p.parse_args()
     out = Path(args.out).resolve()
-    fake = types.SimpleNamespace(model='openai/none', base_url='http://127.0.0.1:1', reasoning_effort='low')
+    fake = types.SimpleNamespace(model='openai/none', base_url='http://127.0.0.1:1')
     run_agent.prepare(args.condition, '(runtime check)', out, fake)
 
     config = OpenHandsConfig()

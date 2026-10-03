@@ -6,7 +6,7 @@
 
 ## 2. 조건별 설정과 작업 폴더
 
-- [x] 2.1 `agent/config.toml.j2`(공통: LLM, `max_iterations=10`, `enable_gpu=true`, 브라우징·MCP 끔, 작업 폴더와 DrugBank 약물 사전 마운트, `save_trajectory_path`)와 조건별 값(B: `base_container_image="ddi-runtime"`, C: `"ddi-specialist"` + 현재 `ddi/`·`server/` 읽기 전용 마운트)을 만든다. 확인: 같은 질문으로 만든 B·C 설정 파일의 `diff`가 실행 폴더 경로 외에는 기본 이미지와 C 전용 마운트뿐이다
+- [x] 2.1 `agent/config.toml.j2`(공통: LLM, `max_iterations=30`(처음 10에서 스모크 테스트 후 30으로 변경), `enable_gpu=true`, 브라우징·MCP 끔, 작업 폴더와 DrugBank 약물 사전 마운트, `save_trajectory_path`)와 조건별 값(B: `base_container_image="ddi-runtime"`, C: `"ddi-specialist"` + 현재 `ddi/`·`server/` 읽기 전용 마운트)을 만든다. 확인: 같은 질문으로 만든 B·C 설정 파일의 `diff`가 실행 폴더 경로 외에는 기본 이미지와 C 전용 마운트뿐이다
 - [x] 2.2 C 준비물을 만든다: `ddi`가 import될 때 예측 서버를 백그라운드로 띄우고 첫 요청 때 준비를 기다리는 기능(이미지의 IPython 시작 파일이 커널 시작 시 `import ddi` — setup.sh는 헤드리스 모드에서 실행되지 않아 대체)과 `agent/c_workspace/.openhands/microagents/ddi.md`(repo 타입, `ddi` 함수 사용법, 모델을 직접 실행하지 말 것, `save_results`로 CSV 저장). 확인: micro agent 파일의 frontmatter를 OpenHands 0.62.0의 `BaseMicroagent.load`로 읽으면 repo 타입으로 파싱된다
 - [x] 2.3 질문 문장 뒤에 붙일 공통 안내(환경 ② 위치, `/workspace`에 CSV 저장, 칼럼 `drug_a, drug_b, relation, prob, model_used, description`)를 `agent/task_suffix.txt`로 만든다. 확인: B·C의 질문 파일이 바이트 단위로 같다
 
@@ -16,9 +16,9 @@
 
 ## 4. 스모크 테스트 (실제 LLM, `AI_GATEWAY_API_KEY` 필요)
 
-- [x] 4.1 C로 "Warfarin이랑 Aspirin 상호작용 예측해줘"를 실행한다. 확인: trajectory에서 import 없이 `ddi` 호출, micro agent 적용이 보이고, 결과 CSV 1행 이상에 관계 5와 방향이 맞는 문장이 있으며, 10턴 안에 끝난다
+- [x] 4.1 C로 "Warfarin이랑 Aspirin 상호작용 예측해줘"를 실행한다. 확인: trajectory에서 import 없이 `ddi` 호출, micro agent 적용이 보이고, 결과 CSV 1행 이상에 관계 5와 방향이 맞는 문장이 있으며, 턴 제한 안에 끝난다
 - [x] 4.2 B로 같은 질문을 실행한다. 확인: 컨테이너에 `ddi`·서버·micro agent가 없고, 환경 ② 파이썬에서 `torch.cuda.is_available()`이 `True`이며, 종료 상태와 턴 수가 `run_info.json`에 기록된다 (B의 정답 여부는 상관없음)
-- [ ] 4.3 LLM 설정 적용을 확인한다: trajectory/게이트웨이 응답에서 모델 이름, temperature 0.0, 추론 강도, 캐시 사용 여부를 확인해 기록한다. 확인: `agent/SMOKE_TEST.md`에 두 실행의 결과, 턴 수, 토큰, 시간과 네 가지 설정의 적용 여부가 적혀 있다
+- [x] 4.3 LLM 설정 적용을 확인한다: trajectory/게이트웨이 응답에서 모델 이름, temperature 0.0, 추론 강도, 캐시 사용 여부를 확인해 기록한다. 확인: `agent/SMOKE_TEST.md`에 두 실행의 결과, 턴 수, 토큰, 시간과 네 가지 설정의 적용 여부가 적혀 있다
 
 ## 5. 문서 반영
 

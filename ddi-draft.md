@@ -70,7 +70,7 @@
 추가로 원문에서 확인한 것
 - CodeAct도 코드 기반 행동의 선행(로봇·게임 제어)을 인정하고 "pre-specified primitives에 의존한다"고 한계를 지적함 → 이 문서의 "처음 제안이라고 쓰지 않음"과 일치
 - CodeAct는 LLM 에이전트의 적용 예로 "performing scientific experiments (Bran et al., 2023 = ChemCrow)"를 듦 → 과학 에이전트 프레이밍의 근거로 인용 가능
-- CodeAct M³ToolEval의 최대 10턴 설정 → 이 연구의 최대 10턴과 같은 기준으로 인용 가능
+- CodeAct M³ToolEval의 최대 10턴 설정 → 처음 기준으로 삼았으나, 이 연구의 B 작업(저장소 탐색 + 추론 스크립트 작성)에는 부족해 30턴으로 늘림(5장)
 - SWE-agent의 ACI 설계 원칙 4가지(간단한 행동, 압축된 행동, 유익하지만 간결한 피드백, 가드레일)는 DDI skill 설계를 설명하는 틀로 그대로 쓸 수 있음 (2.3)
 
 ---
@@ -313,12 +313,13 @@ DDI skill:
 | 호출 경로 | Vercel AI Gateway |
 | 주력 모델 | `anthropic/claude-sonnet-5.5` — 전체 실험 |
 | 교차 검증 모델 | `openai/gpt-6-sol` — 일부(예: 100개) |
-| 추론 강도 | Low (비용 절약, 향후 변경 가능) |
-| temperature | 0.0 고정 (temperature 실험 제외) |
-| 최대 상호작용 턴 | 10 (OpenHands `max_iterations`), 초과 시 실패 — CodeAct M³ToolEval과 같은 기준 |
+| 추론 강도 | 확장 추론 없음 (litellm 1.77.7이 Sonnet 5.5의 추론 강도 설정을 지원하지 않아 적용 불가 — 스모크 테스트에서 확인) |
+| temperature | 0.0 고정 (temperature 실험 제외). 0.0에서도 완전히 결정적이지는 않음 — 별도 대응하지 않음 |
+| 프롬프트 캐싱 | 켬 (Vercel 게이트웨이 `caching: auto`). 비용·속도에만 영향 |
+| 최대 상호작용 턴 | 30 (OpenHands `max_iterations`), 초과 시 실패 — 처음에는 CodeAct M³ToolEval의 10턴을 따랐으나, 스모크 테스트에서 B가 저장소 탐색·추론 스크립트 작성에 10턴을 다 써서 결과를 마무리하지 못함. B가 결과까지 도달해야 정확성을 비교할 수 있으므로 B·C 모두 30으로 늘림 (C는 3~6턴) |
 | OpenHands 버전 | `openhands-ai 0.62.0` 고정 (마지막 V0, 2.1절) |
 
-⚠️ 스모크 테스트 (`agent/SMOKE_TEST.md`): B·C 연결 흐름은 임시 모델 `gemini-3.5-flash`로 확인함 (C: 6턴 완료, 관계 5·방향 정답 / B: 10턴 초과). Gemini에서는 추론 강도·캐싱이 적용되었지만 **temperature 0.0에서도 같은 요청의 답이 달랐음**. Sonnet 5.5(Vercel AI Gateway)로 모델·temperature·추론 강도·캐싱을 다시 확인해야 함
+✅ 스모크 테스트 (`agent/SMOKE_TEST.md`, Sonnet 5.5): C는 3턴에 정답(관계 5, 방향 맞음). B는 관계 번호는 맞혔지만 **약물 방향을 뒤집은 문장**을 냄(표 1의 잘못된 해석 ②가 실제로 나옴). 0.62.0이 모델 이름을 몰라 `native_tool_calling = true`로 함수 호출 모드를 강제하고, 캐싱은 게이트웨이 자동 캐싱으로 켬(C 입력의 74%가 캐시)
 
 ---
 

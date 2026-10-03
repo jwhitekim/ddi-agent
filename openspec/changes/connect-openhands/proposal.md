@@ -8,9 +8,9 @@ B와 C를 실행할 이미지(`ddi-runtime`, `ddi-specialist`)와 C의 도구(�
 
 - **OpenHands `openhands-ai==0.62.0`(마지막 V0, 2025-11-11) 고정**: 호스트에 별도 가상환경으로 설치하고, 헤드리스 모드(`python -m openhands.core.main`)로 CodeActAgent를 실행
 - **조건별 실행 설정 (B, C)**
-  - 공통: 같은 LLM 설정, 최대 상호작용 턴 10, GPU 사용, 같은 질문 문장과 환경 ② 위치 안내 한 줄
+  - 공통: 같은 LLM 설정, 최대 상호작용 턴 30(스모크 테스트 후 10에서 변경), GPU 사용, 같은 질문 문장과 환경 ② 위치 안내 한 줄
   - B: `ddi-runtime`을 기본 이미지로 사용, 작업 폴더는 비어 있음
-  - C: `ddi-specialist`를 기본 이미지로 사용. 작업 폴더에 `.openhands/setup.sh`(예측 서버 시작)와 `.openhands/microagents/`(micro agent 프롬프트)를 둠. 주피터 시작 시 `ddi`가 자동 import됨
+  - C: `ddi-specialist`를 기본 이미지로 사용. 작업 폴더에 `.openhands/microagents/`(micro agent 프롬프트)를 두고, 현재 `ddi/`·`server/`를 마운트. 주피터 시작 시 `ddi`가 자동 import되고, import될 때 예측 서버가 뜸 (처음 계획한 `.openhands/setup.sh`는 헤드리스 모드에서 실행되지 않아 대체)
 - **실행기 `agent/run_agent.py`**: 조건, 질문, 출력 폴더를 받아 작업 폴더와 설정을 만들고, OpenHands를 실행하고, 결과 CSV와 대화 기록(trajectory)을 모음
 - **micro agent 프롬프트 작성** (C 전용): `ddi` 함수 사용법과 "모델을 직접 돌리지 말고 `ddi`를 쓸 것"
 - **스모크 테스트**: B와 C로 같은 질문을 실제 LLM으로 한 번씩 실행해, 환경·GPU·서버·자동 import·턴 제한·LLM 설정 적용을 확인 (문서 5장 ⚠️ 항목)

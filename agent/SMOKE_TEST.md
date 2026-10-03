@@ -2,7 +2,7 @@
 
 기록일: 2026-10-01 · OpenHands `openhands-ai 0.62.0` CodeActAgent · 질문: "Warfarin이랑 Aspirin 상호작용 예측해줘"
 
-> ⚠️ 주력 모델(Vercel AI Gateway `anthropic/claude-sonnet-5.5`)의 API 키가 아직 없어서, 임시로 `gemini/gemini-3.5-flash`(Google AI Studio 키, 직접 호출)로 실행했다. 연결 흐름은 모델과 무관하게 확인됐지만, LLM 설정 적용 여부(아래 3절)는 Sonnet 5.5로 다시 확인해야 한다.
+처음에는 Vercel 키가 없어 임시로 `gemini/gemini-3.5-flash`로 연결 흐름을 확인했고(2~3절), 이후 주력 모델 `anthropic/claude-sonnet-5.5`(Vercel AI Gateway)로 다시 실행했다(6절).
 
 ## 1. 실행 명령
 
@@ -50,7 +50,7 @@
 | 환경 ① 파이썬 (터미널) | OpenHands Python 3.12 | 같음 |
 | 설명 파일, DrugBank 약물 사전 | 있음 | 있음 |
 
-## 3. LLM 설정 적용 확인 (Gemini 기준)
+## 3. LLM 설정 적용 확인 (Gemini 기준, 참고용)
 
 | 설정 | 결과 |
 |---|---|
@@ -73,3 +73,65 @@
 
 - **B의 10턴:** 작업 계획 도구가 턴을 많이 씀. 도구를 끌지(B·C 모두), 턴 수를 늘릴지, 그대로 둘지 정해야 함
 - **비결정성:** temperature 0.0에서도 결과가 달라질 수 있으면, 질문마다 여러 번 실행할지 정해야 함
+
+## 6. Sonnet 5.5 (Vercel AI Gateway, 주력 모델)
+
+설정(처음 실행 시): `model = "openai/anthropic/claude-sonnet-5.5"`, `base_url = "https://ai-gateway.vercel.sh/v1"`, temperature 0.0, `reasoning_effort = "low"`, `caching_prompt = true`, `native_tool_calling = true`
+
+| | C | B |
+|---|---|---|
+| 종료 상태 | `finished` | `max_iterations` (CSV는 저장함) |
+| 상호작용 턴 | 3 | 10 |
+| 걸린 시간 | 62.6초 | 128.9초 |
+| 토큰 (입력 / 캐시 읽기 / 출력) | 47,695 / 0 / 1,328 | 256,715 / 0 / 5,118 |
+| 결과 | 관계 5·72·65, 방향 정답 | 관계 번호는 맞지만 **방향이 뒤집힌 문장** |
+
+**B의 결과 (가설한 오류가 실제로 나옴)**
+
+| 관계 | B의 문장 | 올바른 문장 |
+|---|---|---|
+| 5 | Warfarin may increase the anticoagulant activities of Aspirin. ✗ | Acetylsalicylic acid may increase the anticoagulant activities of Warfarin. |
+| 72 | The serum concentration of Aspirin can be increased when it is combined with Warfarin. ✗ | The serum concentration of Warfarin can be increased when it is combined with Acetylsalicylic acid. |
+| 65 | The risk or severity of bleeding can be increased when Warfarin is combined with Aspirin. ✓ | (대칭 관계) |
+
+- B는 `Subject` 칸을 무시하고 #Drug1에 늘 첫 약물을 넣었다 → 표 1의 "잘못된 해석 ②(방향 무시)". 에러 없이 그럴듯한 CSV를 냈다.
+- B의 확률(관계 5: 0.99750)이 C(0.99787)와 조금 다르다 → 여러 쌍을 묶어 계산한 배치 섞임으로 보임.
+- B는 두 순서(Warfarin–Aspirin, Aspirin–Warfarin)를 모두 계산해 저장했다.
+
+**LLM 설정 적용 확인 (Sonnet 5.5)**
+
+| 설정 | 결과 |
+|---|---|
+| 모델 | 응답 모델 `anthropic/claude-sonnet-5.5` 확인 |
+| 함수 호출 | 0.62.0이 모델 이름을 몰라 텍스트 도구 호출 모드로 돌아감 → Sonnet이 `<invoke>` 형식 글을 써서 C는 출력 48,665토큰을 낭비하고, B는 반복 감지로 중단됨. `native_tool_calling = true`로 해결 |
+| temperature 0.0 | 전달됨. 같은 요청 3번 중 2번 같은 답 (Gemini보다 일관되지만 완전히 결정적이지는 않음) |
+| 추론 강도 `low` | **적용되지 않음.** litellm 1.77.7이 이 모델의 `reasoning_effort`를 지원하지 않아 거부하고, OpenHands는 `drop_params`로 조용히 뺀다. 강제로 보내도(`allowed_openai_params`, `extra_body.reasoning`) 추론 토큰이 0 → 사실상 확장 추론 없이 동작 |
+| 캐싱 | **적용되지 않음** (캐시 읽기 0). 0.62.0의 캐싱 대상 모델 목록이 `claude-sonnet-4*`까지라 `cache_control`을 붙이지 않는다 |
+
+**결정과 조치 (2026-10-03)**
+- 추론 강도: **확장 추론 없음**으로 확정. 설정 파일에서 `reasoning_effort`를 뺐다
+- 캐싱: **켬.** 게이트웨이의 OpenAI 호환 API에 `providerOptions.gateway.caching = "auto"`를 주면 캐시가 동작함을 확인했다(1만 토큰 요청 두 번: 두 번째에 10,223토큰 캐시 읽기). OpenHands는 litellm 프록시가 아니면 `extra_body`를 지우므로, `agent/oh_main.py`가 OpenHands의 litellm 호출을 감싸 게이트웨이 요청에만 이 옵션을 넣는다(OpenHands 소스는 그대로). 메시지에 `cache_control`을 직접 붙이는 방식은 litellm을 거치며 효과가 없었다
+- 캐싱 적용 후 C 재실행: `finished`, 3턴, 63.2초, 입력 48,168 중 **캐시 읽기 35,724 (74%)**, 결과 동일(관계 5·72·65, 방향 정답)
+- temperature 0.0의 비결정성: 원래 LLM에 있는 성질이라 별도 대응하지 않기로 함
+
+## 7. 최대 턴 30으로 변경 후 B 재실행 (Sonnet 5.5, 캐싱 켬)
+
+최대 턴을 B·C 모두 10 → 30으로 늘렸다(B가 10턴 안에 결과를 마무리하지 못해서, 사용자 결정).
+
+| | B (30턴) |
+|---|---|
+| 종료 상태 | `finished` (스스로 종료) |
+| 상호작용 턴 | 13 |
+| 걸린 시간 | 380.7초 |
+| 토큰 (입력 / 캐시 읽기 / 출력) | 1,132,526 / 1,088,288 (96%) / 30,220 |
+
+**B의 결과 (세 가지 오류, 모두 에러 없이 그럴듯한 CSV)**
+
+| B의 행 | 문제 |
+|---|---|
+| `model_used = inductive` | 두 약물 모두 학습셋에 있는데 inductive 모델 사용 |
+| 81, "Warfarin may increase the thrombogenic activities of Aspirin." (1위) | 정답 1위(관계 5)와 다름 |
+| 6, "Warfarin may increase the anticoagulant activities of Aspirin." | 항응고 관계를 DSN-DDI 번호 5가 아니라 설명 파일의 `Interaction type`(6)으로 적음(1칸 밀림) + 방향 뒤집힘 |
+
+- 10턴 실행 때와 오류 양상이 달랐다 → B 쪽 비결정성이 큼
+- 질문 하나에 입력 약 113만 토큰. 본 실험 전에 비용을 어림할 필요가 있음
